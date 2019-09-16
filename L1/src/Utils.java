@@ -1,11 +1,10 @@
-import javafx.util.Pair;
 import java.io.*;
 import java.util.*;
 
 public class Utils {
-    private static Map<String, String> dictionary;
 
-    public static void readDictionary(File file)throws IOException{
+    public static Map<String, String> readDictionary(File file)throws IOException{
+        Map<String,String> dictionary;
         try(BufferedReader br = new BufferedReader(
                new InputStreamReader(
                        new FileInputStream(file), "Cp1251"))) {
@@ -17,6 +16,7 @@ public class Utils {
                 dictionary.put(wordWithoutDashes, line);
             }
         }
+        return dictionary;
    }
 
    public static String readFromFile(File file) throws IOException{
@@ -40,7 +40,7 @@ public class Utils {
        }
    }
 
-   public static boolean wordCorrectDivided(String word){
+   public static boolean wordCorrectDivided(String word, Map<String, String> dictionary){
        String wordWithoutDashes = word.replaceAll("-", "");
        if(dictionary.containsKey(wordWithoutDashes)){
            String value = dictionary.get(wordWithoutDashes);
@@ -60,9 +60,9 @@ public class Utils {
        return true;//если слова нет в словаре - полагаем, что корректно
    }
 
-   public static ChangeMessage getWordChangeMessage(String word) {
+   public static ChangeMessage getWordChangeMessage(String word, Map<String, String> dictionary) {
        String wordWithoutDashes = word.replaceAll("-", "");
-       String correctWordDivision = Utils.getDictionary().get(wordWithoutDashes);
+       String correctWordDivision = dictionary.get(wordWithoutDashes);
        boolean hasDash = false;
        int index=0;
        if(correctWordDivision.matches("[а-яА-Я]+(-[а-яА-Я]+)+")) {
@@ -108,9 +108,6 @@ public class Utils {
        return new ChangeMessage(sb.toString(), correctAnswer.toString(), hasDash);
    }
 
-    public static Map<String, String> getDictionary() {
-        return dictionary;
-    }
 
     public static class ChangeMessage{
         private String message;

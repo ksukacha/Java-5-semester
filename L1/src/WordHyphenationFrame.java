@@ -6,12 +6,13 @@ import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.*;
+import java.util.Map;
 import java.util.StringTokenizer;
 
 public class WordHyphenationFrame extends JFrame {
     private TextPanel textPanel;
     private File fileToCheck;
-    private File fileDictionary;
+    private Map<String, String> dictionary;
 
     public WordHyphenationFrame() {
         super("Слова");
@@ -26,16 +27,20 @@ public class WordHyphenationFrame extends JFrame {
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent ev) {
-                confirmFileSaving();
-                dispose();
+                int optionPressed = fileSavingConfirmation();
+                int fileChooserOptionPressed = 0;
+                if(optionPressed == JOptionPane.OK_OPTION){
+                    fileChooserOptionPressed = save();
+
+                }
+                if(optionPressed != JOptionPane.CLOSED_OPTION) {
+                    if(fileChooserOptionPressed == JFileChooser.APPROVE_OPTION) {
+                        dispose();
+                    }
+                }
             }
         });
-        fileDictionary = new File("C:\\Users\\DELL\\Documents\\JAVA\\5 сем лабы\\words1.txt");
-        try{
-            Utils.readDictionary(fileDictionary);
-        }catch(IOException ex){
-            JOptionPane.showMessageDialog(WordHyphenationFrame.this, ex.getMessage());
-        }
+
     }
 
     private JMenuBar createMenu() {
@@ -50,7 +55,9 @@ public class WordHyphenationFrame extends JFrame {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if(textPanel.textChanged()){
-                    confirmFileSaving();
+                    if(fileSavingConfirmation() == JOptionPane.OK_OPTION){
+                        save();
+                    }
                 }
                 JFileChooser fileChooser = setUpFileChooserForOpening();
                 int result = fileChooser.showOpenDialog(WordHyphenationFrame.this);
@@ -77,39 +84,42 @@ public class WordHyphenationFrame extends JFrame {
         analizeFile.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-               StringTokenizer st = new StringTokenizer(textPanel.getText(), "., ?!:\n\t\r", true);
-               StringBuffer sb = new StringBuffer();
-               int filledWordsLength = 0;
-               boolean rewrite = false;
-               String word;
-               while(st.hasMoreTokens()){
-                   word = st.nextToken();
-                   if(word.matches("[а-яА-Я]+-[а-яА-Я]+") && !Utils.wordCorrectDivided(word)){
-                           Pair<String, Boolean> correctWordDivision = manageWordCorrection(word);
-                           if(correctWordDivision==null){//пользователь нажал "нет" в JOptionPane
-                               sb.append(word);
-                               filledWordsLength+=(word.length());
-                           }else{
-                               sb.append(correctWordDivision.getKey());
-                               filledWordsLength+=(correctWordDivision.getKey().length());
-                               if(correctWordDivision.getValue()){
-                                   sb.append(textPanel.getText().substring(filledWordsLength));
-                               }else{
-                                   sb.append(textPanel.getText().substring(filledWordsLength+1));
-                               }
-                               rewrite = true;
-                           }
-                   }else{
-                       sb.append(word);
-                       filledWordsLength+=(word.length());
-                   }
-                   if(rewrite){
-                       rewrite = false;
-                       textPanel.update(sb.toString());
-                       sb = new StringBuffer(sb.substring(0, filledWordsLength));
-                   }
-               }
-               JOptionPane.showMessageDialog(WordHyphenationFrame.this, "Переносы корректны", "Проверка завершена", JOptionPane.INFORMATION_MESSAGE);
+                if (dictionary != null) {
+                    StringTokenizer st = new StringTokenizer(textPanel.getText(), "., ?!:\n\t\r", true);
+                    StringBuffer sb = new StringBuffer();
+                    int filledWordsLength = 0;
+                    boolean rewrite = false;
+                    String word;
+                    while (st.hasMoreTokens()) {
+                        word = st.nextToken();
+                        if (word.matches("[а-яА-Я]+-[а-яА-Я]+") && !Utils.wordCorrectDivided(word, dictionary)) {
+                            Pair<String, Boolean> correctWordDivision = manageWordCorrection(word, dictionary);
+                            if (correctWordDivision == null) {//пользователь нажал "нет" в JOptionPane; ничего не надо менять
+                                sb.append(word);
+                                filledWordsLength += (word.length());
+                            } else {
+                                sb.append(correctWordDivision.getKey());
+                                filledWordsLength += (correctWordDivision.getKey().length());
+                                if (correctWordDivision.getValue()) {
+                                    sb.append(textPanel.getText().substring(filledWordsLength));
+                                } else {
+                                    sb.append(textPanel.getText().substring(filledWordsLength + 1));
+                                }
+                                rewrite = true;
+                            }
+                        } else {
+                            sb.append(word);
+                            filledWordsLength += (word.length());
+                        }
+                        if (rewrite) {
+                            rewrite = false;
+                            textPanel.update(sb.toString());
+                            sb = new StringBuffer(sb.substring(0, filledWordsLength));
+                        }
+                    }
+                }else {
+                    JOptionPane.showMessageDialog(WordHyphenationFrame.this, "Файл словаря не выбран", "Выберите словарь", JOptionPane.ERROR_MESSAGE);
+                }
             }
         });
 
@@ -120,8 +130,8 @@ public class WordHyphenationFrame extends JFrame {
                     JFileChooser fileChooser = setUpFileChooserForOpening();
                     int result = fileChooser.showOpenDialog(WordHyphenationFrame.this);
                     if (result == JFileChooser.APPROVE_OPTION) {
-                        fileDictionary = fileChooser.getSelectedFile();
-                        Utils.readDictionary(fileDictionary);
+                        File fileDictionary = fileChooser.getSelectedFile();
+                        dictionary = Utils.readDictionary(fileDictionary);
                     }
                 }catch(IOException ex){
                     JOptionPane.showMessageDialog(WordHyphenationFrame.this, ex.getMessage());
@@ -139,18 +149,15 @@ public class WordHyphenationFrame extends JFrame {
         return menuBar;
     }
 
-    private void confirmFileSaving() {
-        int optionPressed = JOptionPane.showConfirmDialog(WordHyphenationFrame.this,
+    private int fileSavingConfirmation() {
+        return JOptionPane.showConfirmDialog(WordHyphenationFrame.this,
                 "Сохранить файл?",
                 "Сохранение",
                 JOptionPane.YES_NO_OPTION);
-        if(optionPressed == JOptionPane.OK_OPTION){
-            save();
-        }
     }
 
-    private void save() {
-        JFileChooser fileChooser = new JFileChooser("C:\\Users\\DELL\\Documents\\JAVA\\5 сем лабы");
+    private int save() {
+        JFileChooser fileChooser = new JFileChooser();
         setUpFileChooserForSaving(fileChooser);
         int result = fileChooser.showSaveDialog(WordHyphenationFrame.this);
         if (result == JFileChooser.APPROVE_OPTION) {
@@ -162,6 +169,7 @@ public class WordHyphenationFrame extends JFrame {
                 JOptionPane.showMessageDialog(WordHyphenationFrame.this, ex.getMessage());
             }
         }
+        return result;
     }
 
     private void setUpFileChooserForSaving(JFileChooser fileChooser){
@@ -172,7 +180,7 @@ public class WordHyphenationFrame extends JFrame {
     }
 
     private JFileChooser setUpFileChooserForOpening(){
-        JFileChooser fileChooser = new JFileChooser("C:\\Users\\DELL\\Documents\\JAVA\\5 сем лабы");
+        JFileChooser fileChooser = new JFileChooser();
         fileChooser.setDialogTitle("Выбор файла");
         TextFileFilter filter = new TextFileFilter();
         fileChooser.addChoosableFileFilter(filter);
@@ -180,8 +188,8 @@ public class WordHyphenationFrame extends JFrame {
         return fileChooser;
     }
 
-    private Pair<String, Boolean> manageWordCorrection(String word){//f2
-        Utils.ChangeMessage wordChangeMessage = Utils.getWordChangeMessage(word);
+    private Pair<String, Boolean> manageWordCorrection(String word, Map<String, String> dictionary){//f2
+        Utils.ChangeMessage wordChangeMessage = Utils.getWordChangeMessage(word, dictionary);
         int res = JOptionPane.showConfirmDialog(WordHyphenationFrame.this, wordChangeMessage.getMessage(), "Найдена ошибка переноса", JOptionPane.YES_NO_OPTION);
         if (res == JOptionPane.OK_OPTION) {
             return new Pair<>(wordChangeMessage.getCorrectWord(), wordChangeMessage.hasDash());
